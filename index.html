@@ -1,0 +1,94 @@
+# 在Colab中运行完整的金融分析
+import pandas as pd
+import yfinance as yf
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from datetime import datetime, timedelta
+import numpy as np
+
+# 设置中文字体
+plt.rcParams['font.sans-serif'] = ['SimHei']
+plt.rcParams['axes.unicode_minus'] = False
+
+print("🚀 金融数据分析平台 - 直接在浏览器中运行！")
+
+# 交互式输入
+ticker = input("请输入股票代码 (例如: AAPL, TSLA, 000001.SS): ") or "AAPL"
+days = int(input("请输入分析天数 (默认365): ") or "365")
+
+# 获取数据
+end_date = datetime.now()
+start_date = end_date - timedelta(days=days)
+
+print(f"正在获取 {ticker} 的数据...")
+
+try:
+    # 下载数据
+    data = yf.download(ticker, start=start_date, end=end_date)
+    
+    if data.empty:
+        print("未找到数据，请检查股票代码")
+    else:
+        print(f"✅ 成功获取 {len(data)} 条数据")
+        
+        # 计算技术指标
+        data['MA20'] = data['Close'].rolling(window=20).mean()
+        data['MA50'] = data['Close'].rolling(window=50).mean()
+        
+        # 计算RSI
+        delta = data['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        data['RSI'] = 100 - (100 / (1 + rs))
+        
+        # 显示基本信息
+        current_price = data['Close'][-1]
+        prev_price = data['Close'][-2]
+        change = current_price - prev_price
+        change_percent = (change / prev_price) * 100
+        
+        print("\n📊 基本统计:")
+        print(f"当前价格: ${current_price:.2f}")
+        print(f"涨跌: ${change:.2f} ({change_percent:+.2f}%)")
+        print(f"最高价(周期): ${data['High'].max():.2f}")
+        print(f"最低价(周期): ${data['Low'].min():.2f}")
+        
+        # 绘制价格图表
+        plt.figure(figsize=(12, 8))
+        
+        # 价格和移动平均线
+        plt.subplot(2, 1, 1)
+        plt.plot(data.index, data['Close'], label='收盘价', linewidth=2)
+        plt.plot(data.index, data['MA20'], label='20日均线', alpha=0.7)
+        plt.plot(data.index, data['MA50'], label='50日均线', alpha=0.7)
+        plt.title(f'{ticker} 股价分析')
+        plt.ylabel('价格 (USD)')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        
+        # RSI图表
+        plt.subplot(2, 1, 2)
+        plt.plot(data.index, data['RSI'], label='RSI', color='purple')
+        plt.axhline(y=70, color='r', linestyle='--', alpha=0.7, label='超买线')
+        plt.axhline(y=30, color='g', linestyle='--', alpha=0.7, label='超卖线')
+        plt.axhline(y=50, color='gray', linestyle='-', alpha=0.5)
+        plt.ylabel('RSI')
+        plt.xlabel('日期')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.ylim(0, 100)
+        
+        plt.tight_layout()
+        plt.show()
+        
+        # 显示最近的数据
+        print("\n📈 最近5个交易日的价格:")
+        print(data[['Open', 'High', 'Low', 'Close']].tail())
+        
+except Exception as e:
+    print(f"❌ 错误: {e}")
+    print("💡 提示：请检查股票代码格式，例如：")
+    print("   - AAPL (苹果美股)")
+    print("   - 000001.SS (上证指数)")
+    print("   - 0700.HK (腾讯港股)")
